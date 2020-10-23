@@ -211,5 +211,5 @@ dist
 build
 .vs/
 .vscode/
-*.pub
+*.pdb
 *.obj
