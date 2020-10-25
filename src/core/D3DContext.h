@@ -47,7 +47,7 @@ private:
 	// ********
 
 	DXGI_FORMAT m_BackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-	DXGI_FORMAT m_DepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	//DXGI_FORMAT m_DepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
 	std::wstring m_MainWndCaption = L"d3d App";
 
@@ -72,6 +72,8 @@ private:
 	ComPtr<ID3D12CommandAllocator> m_CommandAllocator[SwapChainBufferCount];
 	HANDLE m_FenceEvent;
 
+	ComPtr<ID3D12Resource> m_IndexBuffer;
+	D3D12_INDEX_BUFFER_VIEW m_IndexBufferView;
 private:
 	static D3DContext* instance;
 
@@ -95,6 +97,8 @@ public:
 	void Render();
 
 	void Cleanup();
+
+	void CreateDepthStencilBuffer();
 
 	static void setContext(D3DContext* instance) { D3DContext::instance = instance; }
 
