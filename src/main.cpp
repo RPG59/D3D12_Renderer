@@ -98,6 +98,7 @@ int App::Run(D3DContext* context) {
             }
         }
         else {
+            context->Update();
             context->Render();
         }
     }

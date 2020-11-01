@@ -9,6 +9,7 @@
 #include <wrl/client.h>
 #include <comdef.h>
 #include <d3dcompiler.h>
+#include <DirectXMath.h>
 
 #include <cstdint>
 #include <string>
@@ -18,9 +19,15 @@
 #include "../Util.h"
 
 using Microsoft::WRL::ComPtr;
+using namespace DirectX;
 
 #define WIDTH 1360
 #define HEIGHT 768
+
+struct ConstantBuffer
+{
+	XMFLOAT4 colorMultiplier;
+};
 
 class D3DContext
 {
@@ -58,14 +65,14 @@ private:
 	ComPtr<ID3D12Resource> m_SwapChainBuffer[SwapChainBufferCount];
 	ComPtr<ID3D12Resource> m_DepthStencilBuffer;
 
-	D3D12_VIEWPORT m_ScreenViewport;
-	D3D12_RECT m_ScissorTest;
+	D3D12_VIEWPORT m_ScreenViewport{};
+	D3D12_RECT m_ScissorTest{};
 
 	ComPtr<ID3D12RootSignature> m_RootSignature;
 	ComPtr<ID3D12PipelineState> m_PipelineState;
 	ComPtr<ID3D12Resource> m_VertexBuffer;
 
-	D3D12_VERTEX_BUFFER_VIEW m_VertexBufferView;
+	D3D12_VERTEX_BUFFER_VIEW m_VertexBufferView{};
 
 	int m_frameIndex = 0;
 
@@ -74,6 +81,13 @@ private:
 
 	ComPtr<ID3D12Resource> m_IndexBuffer;
 	D3D12_INDEX_BUFFER_VIEW m_IndexBufferView;
+
+	ComPtr<ID3D12DescriptorHeap> m_MainDescriptorHeap[SwapChainBufferCount];
+	ComPtr<ID3D12Resource> m_ConstantBufferUploadHeap[SwapChainBufferCount];
+
+	ConstantBuffer m_CbColorMultiplierData; // constant buffer data
+
+	void* m_CbColorMultiplierGPUAddress[SwapChainBufferCount];
 private:
 	static D3DContext* instance;
 
@@ -100,6 +114,12 @@ public:
 
 	void CreateDepthStencilBuffer();
 
+	void SetConstantBuffer();
+
+	void UpdateConstantBufferData();
+
+	void Update();
+
 	static void setContext(D3DContext* instance) { D3DContext::instance = instance; }
 
 	static D3DContext* getContext() { return D3DContext::instance; }
@@ -109,11 +129,9 @@ public:
 	static void FlushCommandQueue();
 
 
-
 	inline static ComPtr<ID3D12Device6> GetDevice() { return D3DContext::getContext()->m_Device; }
 
 	inline static ComPtr<ID3D12GraphicsCommandList> GetCommandList() { return D3DContext::getContext()->m_CommandList; }
-
 
 
 	inline static ComPtr<ID3D12CommandQueue> GetCommandQueue() { return D3DContext::getContext()->m_CommandQueue; }
@@ -121,7 +139,8 @@ public:
 	inline void D3DCall()
 	{
 		auto hr = m_Device->GetDeviceRemovedReason();
-		if (FAILED(hr)) {
+		if (FAILED(hr))
+		{
 			_com_error err(hr);
 			OutputDebugString(err.ErrorMessage());
 			throw;

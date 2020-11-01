@@ -7,27 +7,30 @@
 
 D3DContext* D3DContext::instance = nullptr;
 
-void D3DContext::Init(HWND hWindow) {
+void D3DContext::Init(HWND hWindow)
+{
 	HRESULT hr;
 	// #ifndef NDEBUG
 	ComPtr<ID3D12Debug3> debugController;
 	hr = D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
 
 
-	if (FAILED(hr)) {
+	if (FAILED(hr))
+	{
 		DebugBreak();
 	}
 	debugController->EnableDebugLayer();
 	debugController->SetEnableGPUBasedValidation(true);
 	// #endif
 
-	ComPtr<IDXGIFactory3> tmpFactory{};
-	ComPtr<ID3D12Device> tmpDevice{};
+	ComPtr<IDXGIFactory3> tmp_factory{};
+	ComPtr<ID3D12Device> tmp_device{};
 
-	ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(tmpFactory.GetAddressOf())));
+	ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(tmp_factory.GetAddressOf())));
 
-	auto hr_factory7 = tmpFactory->QueryInterface(__uuidof(IDXGIFactory7), (void**)m_DxgiFactory.GetAddressOf());
-	if (FAILED(hr_factory7)) {
+	auto hr_factory7 = tmp_factory->QueryInterface(__uuidof(IDXGIFactory7), (void**)m_DxgiFactory.GetAddressOf());
+	if (FAILED(hr_factory7))
+	{
 		DebugBreak();
 	}
 
@@ -36,10 +39,11 @@ void D3DContext::Init(HWND hWindow) {
 		D3D_FEATURE_LEVEL_12_0,
 		//            IID_PPV_ARGS(&m_Device)
 		//            tmpDevice.GetAddressOf()
-		IID_PPV_ARGS(tmpDevice.GetAddressOf())));
+		IID_PPV_ARGS(tmp_device.GetAddressOf())));
 
-	auto hr_device6 = tmpDevice->QueryInterface(__uuidof(ID3D12Device6), (void**)m_Device.GetAddressOf());
-	if (FAILED(hr_device6)) {
+	auto hr_device6 = tmp_device->QueryInterface(__uuidof(ID3D12Device6), (void**)m_Device.GetAddressOf());
+	if (FAILED(hr_device6))
+	{
 		DebugBreak();
 	}
 
@@ -81,7 +85,8 @@ void D3DContext::Init(HWND hWindow) {
 	// swap chain buffrs
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart());
 
-	for (int i = 0; i < SwapChainBufferCount; ++i) {
+	for (int i = 0; i < SwapChainBufferCount; ++i)
+	{
 		ThrowIfFailed(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(m_SwapChainBuffer[i].GetAddressOf())));
 		m_Device->CreateRenderTargetView(m_SwapChainBuffer[i].Get(), nullptr, rtvHandle);
 		rtvHandle.Offset(m_RtvDescriptorSize);
@@ -89,17 +94,22 @@ void D3DContext::Init(HWND hWindow) {
 	// swap chain buffrs end
 
 	// command allocators 
-	for (int i = 0; i < SwapChainBufferCount; ++i) {
-		ThrowIfFailed(m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_CommandAllocator[i].GetAddressOf())));
+	for (int i = 0; i < SwapChainBufferCount; ++i)
+	{
+		ThrowIfFailed(
+			m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_CommandAllocator[i].
+				GetAddressOf())));
 	}
 	// command allocators end
 
 	// command list 
-	m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator[m_frameIndex].Get(), NULL, IID_PPV_ARGS(m_CommandList.GetAddressOf()));
+	m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator[m_frameIndex].Get(), NULL,
+	                            IID_PPV_ARGS(m_CommandList.GetAddressOf()));
 	// command list end 
 
 	// fence 
-	for (int i = 0; i < SwapChainBufferCount; ++i) {
+	for (int i = 0; i < SwapChainBufferCount; ++i)
+	{
 		ThrowIfFailed(m_Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_Fence[i].GetAddressOf())));
 		m_FenceValue[i] = 0;
 	}
@@ -107,7 +117,8 @@ void D3DContext::Init(HWND hWindow) {
 
 	// handle for fence event 
 	m_FenceEvent = CreateEvent(nullptr, false, false, nullptr);
-	if (m_FenceEvent == nullptr) {
+	if (m_FenceEvent == nullptr)
+	{
 		DebugBreak();
 		return;
 	}
@@ -115,17 +126,7 @@ void D3DContext::Init(HWND hWindow) {
 
 
 	//root signature
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-	rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-	ID3DBlob* signature;
-	if (FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, nullptr))) {
-		DebugBreak();
-	}
-
-	if (FAILED(m_Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(m_RootSignature.GetAddressOf())))) {
-		DebugBreak();
-	}
+	SetConstantBuffer();
 	//root signature end
 
 
@@ -143,7 +144,8 @@ void D3DContext::Init(HWND hWindow) {
 		0,
 		&vsShader,
 		&errorBuff
-	))) {
+	)))
+	{
 		OutputDebugStringA((char*)errorBuff->GetBufferPointer());
 		DebugBreak();
 	}
@@ -164,7 +166,8 @@ void D3DContext::Init(HWND hWindow) {
 		0,
 		&psShader,
 		&errorBuff
-	))) {
+	)))
+	{
 		OutputDebugStringA((char*)errorBuff->GetBufferPointer());
 		DebugBreak();
 	}
@@ -183,7 +186,7 @@ void D3DContext::Init(HWND hWindow) {
 	ild.pInputElementDescs = inputLayout;
 
 	const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
-	{ D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+		{D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS};
 
 	D3D12_DEPTH_STENCIL_DESC dsd{};
 	dsd.DepthEnable = true;
@@ -217,15 +220,15 @@ void D3DContext::Init(HWND hWindow) {
 		0.5f, -0.5f, 0.5f, 0, 0, 0, 1.,
 		-0.5f, -0.5f, 0.5f, 0, 0, 1., 1.,
 		0.5f, 0.5f, 0.5f, 1., 0, 1., 1.,
-		  -0.75f,  0.75f,  0.7f, 0.0f, 1.0f, 0.0f, 1.0f ,
-  0.0f,  0.0f, 0.7f, 0.0f, 1.0f, 0.0f, 1.0f ,
-	 -0.75f,  0.0f, 0.7f, 0.0f, 1.0f, 0.0f, 1.0f ,
-   0.0f,  0.75f,  0.7f, 0.0f, 1.0f, 0.0f, 1.0f
+		-0.75f, 0.75f, 0.7f, 0.0f, 1.0f, 0.0f, 1.0f,
+		0.0f, 0.0f, 0.7f, 0.0f, 1.0f, 0.0f, 1.0f,
+		-0.75f, 0.0f, 0.7f, 0.0f, 1.0f, 0.0f, 1.0f,
+		0.0f, 0.75f, 0.7f, 0.0f, 1.0f, 0.0f, 1.0f
 	};
 
 	uint32_t indices[] = {
-			0, 1, 2,
-			0, 3, 1,
+		0, 1, 2,
+		0, 3, 1,
 
 	};
 
@@ -260,8 +263,9 @@ void D3DContext::Init(HWND hWindow) {
 	UpdateSubresources(m_CommandList.Get(), m_VertexBuffer.Get(), vBufferUploadHeap, 0, 0, 1, &vertexData);
 
 	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-		m_VertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
-	));
+		                               m_VertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
+		                               D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+	                               ));
 
 	// Init index buffer
 	int indexBufferSize = sizeof(indices);
@@ -294,7 +298,9 @@ void D3DContext::Init(HWND hWindow) {
 
 	UpdateSubresources(m_CommandList.Get(), m_IndexBuffer.Get(), indexBufferUploadHeap, 0, 0, 1, &indexData);
 
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_IndexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		                               m_IndexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
+		                               D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 	m_IndexBufferView.BufferLocation = m_IndexBuffer->GetGPUVirtualAddress();
 	m_IndexBufferView.Format = DXGI_FORMAT_R32_UINT;
@@ -302,7 +308,7 @@ void D3DContext::Init(HWND hWindow) {
 	// init index buffer end 
 
 	m_CommandList->Close();
-	ID3D12CommandList* ppCommandLists[] = { m_CommandList.Get() };
+	ID3D12CommandList* ppCommandLists[] = {m_CommandList.Get()};
 	m_CommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 	m_FenceValue[m_frameIndex]++;
@@ -327,14 +333,14 @@ void D3DContext::Init(HWND hWindow) {
 	// viewport end
 
 	// scissor
-	m_ScissorTest = { 0, 0, WIDTH, HEIGHT };
+	m_ScissorTest = {0, 0, WIDTH, HEIGHT};
 	// scissor end
-	
-	CreateDepthStencilBuffer();
 
+	CreateDepthStencilBuffer();
 }
 
-void D3DContext::CreateSwapChain(HWND hWindow) {
+void D3DContext::CreateSwapChain(HWND hWindow)
+{
 	m_SwapChain.Reset();
 
 	DXGI_SWAP_CHAIN_DESC sd{};
@@ -363,7 +369,8 @@ void D3DContext::CreateSwapChain(HWND hWindow) {
 	m_frameIndex = m_SwapChain->GetCurrentBackBufferIndex();
 }
 
-void D3DContext::CreateRtvAndDsvDescriptorHeaps() {
+void D3DContext::CreateRtvAndDsvDescriptorHeaps()
+{
 	D3D12_DESCRIPTOR_HEAP_DESC rhd_rtv{};
 	rhd_rtv.NumDescriptors = SwapChainBufferCount;
 	rhd_rtv.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -381,12 +388,14 @@ void D3DContext::CreateRtvAndDsvDescriptorHeaps() {
 	ThrowIfFailed(m_Device->CreateDescriptorHeap(&rhd_dsv, IID_PPV_ARGS(m_DsvHeap.GetAddressOf())));
 }
 
-void D3DContext::LogAdapters() {
+void D3DContext::LogAdapters()
+{
 	uint32_t i = 0;
 	IDXGIAdapter* pAdapter = nullptr;
 	std::vector<IDXGIAdapter*> adapterList;
 
-	while (m_DxgiFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND) {
+	while (m_DxgiFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND)
+	{
 		DXGI_ADAPTER_DESC desc;
 		pAdapter->GetDesc(&desc);
 
@@ -394,19 +403,21 @@ void D3DContext::LogAdapters() {
 		adapterName += desc.Description;
 		adapterName += L"\n";
 
-		// OutputDebugString((adapterName.c_str());
+		OutputDebugString(adapterName.c_str());
 
 		adapterList.push_back(pAdapter);
 
 		++i;
 	}
 
-	for (size_t i = 0; i < adapterList.size(); ++i) {
+	for (size_t i = 0; i < adapterList.size(); ++i)
+	{
 		ReleaseCom(adapterList[i]);
 	}
 }
 
-void D3DContext::CreateDepthStencilBuffer() {
+void D3DContext::CreateDepthStencilBuffer()
+{
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
 	dsvd.Format = DXGI_FORMAT_D32_FLOAT;
 	dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
@@ -420,33 +431,50 @@ void D3DContext::CreateDepthStencilBuffer() {
 	m_Device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, WIDTH, HEIGHT, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+		&CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, WIDTH, HEIGHT, 1, 0, 1, 0,
+		                              D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
 		D3D12_RESOURCE_STATE_DEPTH_WRITE,
 		&depthOptimizedCliarValue,
 		IID_PPV_ARGS(&m_DepthStencilBuffer)
 	);
 
 	m_DsvHeap->SetName(L"Depth/Stencil Resource Map");
-	m_Device->CreateDepthStencilView(m_DepthStencilBuffer.Get(), &dsvd, m_DsvHeap->GetCPUDescriptorHandleForHeapStart());
+	m_Device->CreateDepthStencilView(m_DepthStencilBuffer.Get(), &dsvd,
+	                                 m_DsvHeap->GetCPUDescriptorHandleForHeapStart());
+
+	UpdateConstantBufferData();
 }
 
-void D3DContext::UpdatePipeline() {
+void D3DContext::UpdatePipeline()
+{
 	WaitForPrevFrame();
 
 	ThrowIfFailed(m_CommandAllocator[m_frameIndex]->Reset());
 	ThrowIfFailed(m_CommandList->Reset(m_CommandAllocator[m_frameIndex].Get(), m_PipelineState.Get()));
 
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChainBuffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_RtvDescriptorSize);
+	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		                               m_SwapChainBuffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT,
+		                               D3D12_RESOURCE_STATE_RENDER_TARGET));
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex,
+	                                        m_RtvDescriptorSize);
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_DsvHeap->GetCPUDescriptorHandleForHeapStart());
 	m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-	const float color[4] = { .3, .4, .1, .0 };
+	const float color[4] = {.3, .4, .1, .0};
 	m_CommandList->ClearRenderTargetView(rtvHandle, color, 0, nullptr);
-	m_CommandList->ClearDepthStencilView(m_DsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1., 0, 0, nullptr);
+	m_CommandList->ClearDepthStencilView(m_DsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1., 0,
+	                                     0, nullptr);
 
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = { m_MainDescriptorHeap[m_frameIndex].Get() };
+	m_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	m_CommandList->SetGraphicsRootDescriptorTable(0, m_MainDescriptorHeap[m_frameIndex]->GetGPUDescriptorHandleForHeapStart());
+
+	
+
 	m_CommandList->RSSetViewports(1, &m_ScreenViewport);
 	m_CommandList->RSSetScissorRects(1, &m_ScissorTest);
 	m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -457,16 +485,18 @@ void D3DContext::UpdatePipeline() {
 	m_CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
-	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChainBuffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	m_CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		                               m_SwapChainBuffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET,
+		                               D3D12_RESOURCE_STATE_PRESENT));
 
 	ThrowIfFailed(m_CommandList->Close());
-
 }
 
-void D3DContext::Render() {
+void D3DContext::Render()
+{
 	UpdatePipeline();
 
-	ID3D12CommandList* ppCommandLists[] = { m_CommandList.Get() };
+	ID3D12CommandList* ppCommandLists[] = {m_CommandList.Get()};
 
 	m_CommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
@@ -474,10 +504,12 @@ void D3DContext::Render() {
 	ThrowIfFailed(m_SwapChain->Present(0, 0));
 }
 
-void D3DContext::WaitForPrevFrame() {
+void D3DContext::WaitForPrevFrame()
+{
 	m_frameIndex = m_SwapChain->GetCurrentBackBufferIndex();
 
-	if (m_Fence[m_frameIndex]->GetCompletedValue() < m_FenceValue[m_frameIndex]) {
+	if (m_Fence[m_frameIndex]->GetCompletedValue() < m_FenceValue[m_frameIndex])
+	{
 		ThrowIfFailed(m_Fence[m_frameIndex]->SetEventOnCompletion(m_FenceValue[m_frameIndex], m_FenceEvent));
 
 		WaitForSingleObject(m_FenceEvent, INFINITE);
@@ -486,10 +518,108 @@ void D3DContext::WaitForPrevFrame() {
 	m_FenceValue[m_frameIndex]++;
 }
 
+void D3DContext::SetConstantBuffer()
+{
+	D3D12_DESCRIPTOR_RANGE dr[1];
+	dr[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV; // constant buffer view (b resister)
+	dr[0].NumDescriptors = 1;
+	dr[0].BaseShaderRegister = 0;
+	dr[0].RegisterSpace = 0;
+	dr[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	D3D12_ROOT_DESCRIPTOR_TABLE dt{};
+	dt.NumDescriptorRanges = _countof(dr);
+	dt.pDescriptorRanges = dr;
+
+	D3D12_ROOT_PARAMETER rp[1];
+	rp[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rp[0].DescriptorTable = dt;
+	rp[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+	rootSignatureDesc.Init(
+		1,
+		rp,
+		0,
+		nullptr,
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS);
+
+	ID3DBlob* signature;
+	if (FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, nullptr)))
+	{
+		DebugBreak();
+	}
+
+	if (FAILED(
+		m_Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(
+			m_RootSignature.GetAddressOf()))))
+	{
+		DebugBreak();
+	}
+}
+
+void D3DContext::UpdateConstantBufferData()
+{
+	for (int i = 0; i < SwapChainBufferCount; ++i)
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
+		heapDesc.NumDescriptors = 1;
+		heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+		ThrowIfFailed(m_Device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(m_MainDescriptorHeap[i].GetAddressOf())));
+
+		ThrowIfFailed(m_Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(m_ConstantBufferUploadHeap[i].GetAddressOf())
+		));
+		m_ConstantBufferUploadHeap[i]->SetName(L"Constant buffer upload heap");
 
 
+		D3D12_CONSTANT_BUFFER_VIEW_DESC sbvDesc{};
+		sbvDesc.BufferLocation = m_ConstantBufferUploadHeap[i]->GetGPUVirtualAddress();
+		sbvDesc.SizeInBytes = (sizeof(ConstantBuffer) + 255) & ~255; // 256 alignment 
+		m_Device->CreateConstantBufferView(&sbvDesc, m_MainDescriptorHeap[i]->GetCPUDescriptorHandleForHeapStart());
+
+		m_CbColorMultiplierData = {};
+
+		CD3DX12_RANGE readRange(0, 0);
+		ThrowIfFailed(m_ConstantBufferUploadHeap[i]->Map(0, &readRange, &m_CbColorMultiplierGPUAddress[i]));
+		memcpy(m_CbColorMultiplierGPUAddress[i], &m_CbColorMultiplierData, sizeof(m_CbColorMultiplierData));
+	}
+}
 
 
+void D3DContext::Update()
+{
+	static float rIncrement = 0.00002;
+	static float gIncrement = 0.00006;
+	static float bIncrement = 0.00009;
 
+	m_CbColorMultiplierData.colorMultiplier.x += rIncrement;
+	m_CbColorMultiplierData.colorMultiplier.y += gIncrement;
+	m_CbColorMultiplierData.colorMultiplier.z += bIncrement;
 
+	if (m_CbColorMultiplierData.colorMultiplier.x >= 1.0f)
+	{
+		m_CbColorMultiplierData.colorMultiplier.x = 0;
+	}
+	if (m_CbColorMultiplierData.colorMultiplier.y >= 1.0f)
+	{
+		m_CbColorMultiplierData.colorMultiplier.y = 0;
+	}
+	if (m_CbColorMultiplierData.colorMultiplier.z >= 1.0f)
+	{
+		m_CbColorMultiplierData.colorMultiplier.z = 0;
+	}
 
+	memcpy(m_CbColorMultiplierGPUAddress[m_frameIndex], &m_CbColorMultiplierData, sizeof(m_CbColorMultiplierData));
+}
