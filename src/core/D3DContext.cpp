@@ -468,20 +468,17 @@ void D3DContext::UpdatePipeline()
 
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { m_MainDescriptorHeap[m_frameIndex].Get() };
-	m_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-	m_CommandList->SetGraphicsRootDescriptorTable(0, m_MainDescriptorHeap[m_frameIndex]->GetGPUDescriptorHandleForHeapStart());
-
-	
-
 	m_CommandList->RSSetViewports(1, &m_ScreenViewport);
 	m_CommandList->RSSetScissorRects(1, &m_ScissorTest);
 	m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_CommandList->IASetVertexBuffers(0, 1, &m_VertexBufferView);
 	m_CommandList->IASetIndexBuffer(&m_IndexBufferView);
 	//m_CommandList->DrawInstanced(3, 1, 0, 0);
+
+	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[m_frameIndex]->GetGPUVirtualAddress());
 	m_CommandList->DrawIndexedInstanced(6, 1, 0, 4, 0);
+
+	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[m_frameIndex]->GetGPUVirtualAddress() + m_ConstantBufferPerObjectAlignedSize);
 	m_CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
@@ -520,20 +517,13 @@ void D3DContext::WaitForPrevFrame()
 
 void D3DContext::SetConstantBuffer()
 {
-	D3D12_DESCRIPTOR_RANGE dr[1];
-	dr[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV; // constant buffer view (b resister)
-	dr[0].NumDescriptors = 1;
-	dr[0].BaseShaderRegister = 0;
-	dr[0].RegisterSpace = 0;
-	dr[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-	D3D12_ROOT_DESCRIPTOR_TABLE dt{};
-	dt.NumDescriptorRanges = _countof(dr);
-	dt.pDescriptorRanges = dr;
+	D3D12_ROOT_DESCRIPTOR rootCBVDescriptor{};
+	rootCBVDescriptor.ShaderRegister = 0;
+	rootCBVDescriptor.RegisterSpace = 0;
 
 	D3D12_ROOT_PARAMETER rp[1];
-	rp[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rp[0].DescriptorTable = dt;
+	rp[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rp[0].Descriptor = rootCBVDescriptor;
 	rp[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
@@ -566,60 +556,91 @@ void D3DContext::UpdateConstantBufferData()
 {
 	for (int i = 0; i < SwapChainBufferCount; ++i)
 	{
-		D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
-		heapDesc.NumDescriptors = 1;
-		heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-
-		ThrowIfFailed(m_Device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(m_MainDescriptorHeap[i].GetAddressOf())));
-
 		ThrowIfFailed(m_Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(m_ConstantBufferUploadHeap[i].GetAddressOf())
+			IID_PPV_ARGS(m_ConstantBufferUploadHeaps[i].GetAddressOf())
 		));
-		m_ConstantBufferUploadHeap[i]->SetName(L"Constant buffer upload heap");
+		m_ConstantBufferUploadHeaps[i]->SetName(L"Constant buffer upload heap");
 
-
-		D3D12_CONSTANT_BUFFER_VIEW_DESC sbvDesc{};
-		sbvDesc.BufferLocation = m_ConstantBufferUploadHeap[i]->GetGPUVirtualAddress();
-		sbvDesc.SizeInBytes = (sizeof(ConstantBuffer) + 255) & ~255; // 256 alignment 
-		m_Device->CreateConstantBufferView(&sbvDesc, m_MainDescriptorHeap[i]->GetCPUDescriptorHandleForHeapStart());
-
-		m_CbColorMultiplierData = {};
+		m_CbPerObjec = {};
 
 		CD3DX12_RANGE readRange(0, 0);
-		ThrowIfFailed(m_ConstantBufferUploadHeap[i]->Map(0, &readRange, &m_CbColorMultiplierGPUAddress[i]));
-		memcpy(m_CbColorMultiplierGPUAddress[i], &m_CbColorMultiplierData, sizeof(m_CbColorMultiplierData));
+		ThrowIfFailed(m_ConstantBufferUploadHeaps[i]->Map(0, &readRange, reinterpret_cast<void**>(&m_CbGPUAddress[i])));
+		memcpy((m_CbGPUAddress[i]), &m_CbPerObjec, sizeof(m_CbPerObjec));
+		memcpy(m_CbGPUAddress[i] + m_ConstantBufferPerObjectAlignedSize, &m_CbPerObjec, sizeof(m_CbPerObjec));
 	}
+
+	XMMATRIX tmpMat = XMMatrixPerspectiveFovLH(45. * (XM_PI / 180.), (float)WIDTH / (float)HEIGHT, .1, 1000.);
+	XMStoreFloat4x4(&m_ProjectionMatrix, tmpMat);
+
+	m_CameraPosition = XMFLOAT4(.0, 2., -4., .0);
+	m_CameraTarget = XMFLOAT4(.0, .0, .0, .0);
+	m_CameraUp = XMFLOAT4(0, 1., 0., 0.);
+
+	tmpMat = XMMatrixLookAtLH(
+		XMLoadFloat4(&m_CameraPosition),
+		XMLoadFloat4(&m_CameraTarget),
+		XMLoadFloat4(&m_CameraUp));
+	XMStoreFloat4x4(&m_ViewMatrix, tmpMat);
+
+	m_Cube1Position = XMFLOAT4(.0, .0, .0, .0);
+	XMVECTOR posVec = XMLoadFloat4(&m_Cube1Position);
+
+	tmpMat = XMMatrixTranslationFromVector(posVec);
+	XMStoreFloat4x4(&m_Cube1RotationMatrix, XMMatrixIdentity());
+	XMStoreFloat4x4(&m_Cube1WorldMatrix, tmpMat);
+
+	m_Cube2PositionOffset = XMFLOAT4(1.5, .0, .0, .0);
+	posVec = XMLoadFloat4(&m_Cube2PositionOffset);
+
+	tmpMat = XMMatrixTranslationFromVector(posVec);
+	XMStoreFloat4x4(&m_Cube2RotationMatrix, XMMatrixIdentity());
+	XMStoreFloat4x4(&m_Cube2WorldMatrix, tmpMat);
 }
 
 
 void D3DContext::Update()
 {
-	static float rIncrement = 0.00002;
-	static float gIncrement = 0.00006;
-	static float bIncrement = 0.00009;
+	XMMATRIX rotXmat = XMMatrixRotationX(.0001);
+	XMMATRIX rotYmat = XMMatrixRotationY(.0002);
+	XMMATRIX rotZmat = XMMatrixRotationZ(.0003);
 
-	m_CbColorMultiplierData.colorMultiplier.x += rIncrement;
-	m_CbColorMultiplierData.colorMultiplier.y += gIncrement;
-	m_CbColorMultiplierData.colorMultiplier.z += bIncrement;
+	XMMATRIX rotMat = XMLoadFloat4x4(&m_Cube1RotationMatrix) * rotXmat * rotYmat * rotZmat;
+	XMStoreFloat4x4(&m_Cube1RotationMatrix, rotMat);
 
-	if (m_CbColorMultiplierData.colorMultiplier.x >= 1.0f)
-	{
-		m_CbColorMultiplierData.colorMultiplier.x = 0;
-	}
-	if (m_CbColorMultiplierData.colorMultiplier.y >= 1.0f)
-	{
-		m_CbColorMultiplierData.colorMultiplier.y = 0;
-	}
-	if (m_CbColorMultiplierData.colorMultiplier.z >= 1.0f)
-	{
-		m_CbColorMultiplierData.colorMultiplier.z = 0;
-	}
+	XMMATRIX translationMat = XMMatrixTranslationFromVector(XMLoadFloat4(&m_Cube1Position));
+	XMMATRIX worldMat = rotMat * translationMat;
+	XMStoreFloat4x4(&m_Cube1WorldMatrix, worldMat);
 
-	memcpy(m_CbColorMultiplierGPUAddress[m_frameIndex], &m_CbColorMultiplierData, sizeof(m_CbColorMultiplierData));
+	XMMATRIX viewMat = XMLoadFloat4x4(&m_ViewMatrix);
+	XMMATRIX porjMat = XMLoadFloat4x4(&m_ProjectionMatrix);
+	XMMATRIX mvpMat = XMLoadFloat4x4(&m_Cube1WorldMatrix) * viewMat * porjMat;
+	XMMATRIX transposed = XMMatrixTranspose(mvpMat);
+	XMStoreFloat4x4(&m_CbPerObjec.mvpMatrix, transposed);
+
+	memcpy(m_CbGPUAddress[m_frameIndex], &m_CbPerObjec, sizeof(m_CbPerObjec));
+
+	rotXmat = XMMatrixRotationX(.0003);
+	rotYmat = XMMatrixRotationY(.0002);
+	rotZmat = XMMatrixRotationZ(.0001);
+
+	rotMat = rotZmat * (XMLoadFloat4x4(&m_Cube2RotationMatrix) * (rotXmat * rotYmat));
+	XMStoreFloat4x4(&m_Cube2RotationMatrix, rotMat);
+
+	XMMATRIX translationOffsetMat = XMMatrixTranslationFromVector(XMLoadFloat4(&m_Cube2PositionOffset));
+
+	XMMATRIX scaleMat = XMMatrixScaling(.5, .5, .5);
+
+	worldMat = scaleMat * translationOffsetMat * rotMat * translationMat;
+	mvpMat = XMLoadFloat4x4(&m_Cube2WorldMatrix) * viewMat * porjMat;
+	transposed = XMMatrixTranspose(mvpMat);
+	XMStoreFloat4x4(&m_CbPerObjec.mvpMatrix, transposed);
+
+	memcpy(m_CbGPUAddress[m_frameIndex] + m_ConstantBufferPerObjectAlignedSize, &m_CbPerObjec, sizeof(m_CbPerObjec));
+
+	XMStoreFloat4x4(&m_Cube2WorldMatrix, worldMat);
 }

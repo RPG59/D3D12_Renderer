@@ -29,6 +29,11 @@ struct ConstantBuffer
 	XMFLOAT4 colorMultiplier;
 };
 
+struct ConstantBufferPerObject
+{
+	XMFLOAT4X4 mvpMatrix;
+};
+
 class D3DContext
 {
 private:
@@ -83,11 +88,34 @@ private:
 	D3D12_INDEX_BUFFER_VIEW m_IndexBufferView;
 
 	ComPtr<ID3D12DescriptorHeap> m_MainDescriptorHeap[SwapChainBufferCount];
-	ComPtr<ID3D12Resource> m_ConstantBufferUploadHeap[SwapChainBufferCount];
 
 	ConstantBuffer m_CbColorMultiplierData; // constant buffer data
 
-	void* m_CbColorMultiplierGPUAddress[SwapChainBufferCount];
+
+	ConstantBufferPerObject m_CbPerObjec;
+
+	ComPtr<ID3D12Resource> m_ConstantBufferUploadHeaps[SwapChainBufferCount];
+
+	uint8_t* m_CbGPUAddress[SwapChainBufferCount];
+
+	XMFLOAT4X4 m_ProjectionMatrix;
+	XMFLOAT4X4 m_ViewMatrix;
+
+	XMFLOAT4 m_CameraPosition;
+	XMFLOAT4 m_CameraTarget;
+	XMFLOAT4 m_CameraUp;
+
+	XMFLOAT4X4 m_Cube1WorldMatrix;
+	XMFLOAT4X4 m_Cube1RotationMatrix;
+	XMFLOAT4 m_Cube1Position;
+
+	XMFLOAT4X4 m_Cube2WorldMatrix;
+	XMFLOAT4X4 m_Cube2RotationMatrix;
+	XMFLOAT4 m_Cube2PositionOffset;
+
+	int m_NumCubeIndex;
+	int m_ConstantBufferPerObjectAlignedSize = (sizeof(ConstantBufferPerObject) + 255) & ~255;
+	
 private:
 	static D3DContext* instance;
 

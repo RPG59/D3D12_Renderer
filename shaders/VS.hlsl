@@ -1,3 +1,7 @@
+// constant buffers -> b redister
+// textures -> t register
+// us -> u register
+
 struct VS_OUTPUT {
 	float4 pos: SV_POSITION;
 	float4 color: COLOR;
@@ -5,13 +9,13 @@ struct VS_OUTPUT {
 
 cbuffer ConstantBuffer : register(b0)
 {
-	float4 colorMultiplier;
+	float4x4 mvpMatrix;
 }
 
 VS_OUTPUT main(float3 pos: POSITION, float4 color : COLOR) {
 	VS_OUTPUT output;
-	output.pos = float4(pos, 1.);
-	output.color = color * colorMultiplier;
+	output.pos = mul(float4(pos, 1.), mvpMatrix);
+	output.color = color;
 	return output;
 }
 
