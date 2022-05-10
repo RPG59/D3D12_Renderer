@@ -213,3 +213,4 @@ build
 .vscode/
 *.pdb
 *.obj
+.cmake
