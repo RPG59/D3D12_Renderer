@@ -1,9 +1,33 @@
 #include <Windows.h>
 #include <iostream>
 
+#include "assimp/Importer.hpp"
+#include "assimp/scene.h"
+#include "assimp/postprocess.h"
+
 #include "core/D3DContext.h"
 
 LRESULT CALLBACK MainWndProc(HWND hwnd, uint32_t msg, WPARAM wParam, LPARAM lParam);
+
+void loadScene()
+{
+    Assimp::Importer importer;
+
+    const std::string path = "../../assets/LP1.obj";
+    const auto scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_MakeLeftHanded);
+
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
+    {
+        return;
+    }
+
+    for (uint32_t i = 0; i < scene->mNumMeshes; ++i)
+    {
+        auto mesh = scene->mMeshes[i];
+
+        std::cout << mesh->mNumVertices << std::endl;
+    }
+}
 
 class App
 {
@@ -135,6 +159,8 @@ int CALLBACK WinMain(
     {
         return EXIT_FAILURE;
     }
+
+    // loadScene();
 
     D3DContext::getContext()->Init(App::GetApp()->getHWND());
 

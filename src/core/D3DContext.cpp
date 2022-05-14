@@ -1,7 +1,3 @@
-//
-// Created by RPG59 on 9/20/2020.
-//
-
 #include "D3DContext.h"
 
 D3DContext *D3DContext::instance = nullptr;
@@ -98,7 +94,8 @@ void D3DContext::Init(HWND hWindow)
 	// command allocators end
 
 	// command list
-	m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator[m_frameIndex].Get(), NULL,
+	m_Device->CreateCommandList(0,
+															D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator[m_frameIndex].Get(), NULL,
 															IID_PPV_ARGS(m_CommandList.GetAddressOf()));
 	// command list end
 
@@ -226,44 +223,55 @@ void D3DContext::Init(HWND hWindow)
 	};
 
 	uint32_t vBufferSize = sizeof(vertices);
-	auto vertexBufferProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	auto vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vBufferSize);
+	// auto vertexBufferProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	// auto vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vBufferSize);
 
-	ThrowIfFailed(m_Device->CreateCommittedResource(
-			&vertexBufferProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(m_VertexBuffer.GetAddressOf())));
+	// ThrowIfFailed(m_Device->CreateCommittedResource(
+	// 		&vertexBufferProperties,
+	// 		D3D12_HEAP_FLAG_NONE,
+	// 		&vertexBufferDesc,
+	// 		D3D12_RESOURCE_STATE_COPY_DEST,
+	// 		nullptr,
+	// 		IID_PPV_ARGS(m_VertexBuffer.GetAddressOf())));
 
-	m_VertexBuffer->SetName(L"Vertex Buffer Resource Heap");
+	// auto vBufferUploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	// auto vBufferUploadHeapDesc = CD3DX12_RESOURCE_DESC::Buffer(vBufferSize);
+	// ID3D12Resource *vBufferUploadHeap = nullptr;
 
-	auto vBufferUploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	auto vBufferUploadHeapDesc = CD3DX12_RESOURCE_DESC::Buffer(vBufferSize);
-	ID3D12Resource *vBufferUploadHeap = nullptr;
+	// ThrowIfFailed(m_Device->CreateCommittedResource(
+	// 		&vBufferUploadHeapProps,
+	// 		D3D12_HEAP_FLAG_NONE,
+	// 		&vBufferUploadHeapDesc,
+	// 		D3D12_RESOURCE_STATE_GENERIC_READ,
+	// 		nullptr,
+	// 		IID_PPV_ARGS(&vBufferUploadHeap)));
+	// vBufferUploadHeap->SetName(L"Vertex Buffer Upload Resource Heap");
 
-	ThrowIfFailed(m_Device->CreateCommittedResource(
-			&vBufferUploadHeapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&vBufferUploadHeapDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&vBufferUploadHeap)));
-	vBufferUploadHeap->SetName(L"Vertex Buffer Upload Resource Heap");
+	UploadBuffer vertexUploadBuffer = UploadBuffer();
+
+	vertexUploadBuffer.create(L"vertex upload buffer", sizeof(vertices));
+	void *uploadMem = vertexUploadBuffer.map();
+
+	memcpy(uploadMem, vertices, sizeof(vertices));
+	vertexUploadBuffer.unmap();
+
+	m_VertexBuffer = GpuBuffer();
+	m_VertexBuffer.create(L"Vertex Buffer", 56, sizeof(float), vertexUploadBuffer);
 
 	D3D12_SUBRESOURCE_DATA vertexData{};
 	vertexData.pData = reinterpret_cast<BYTE *>(vertices);
 	vertexData.RowPitch = vBufferSize;
 	vertexData.SlicePitch = vBufferSize;
 
-	UpdateSubresources(m_CommandList.Get(), m_VertexBuffer.Get(), vBufferUploadHeap, 0, 0, 1, &vertexData);
+	// UpdateSubresources(m_CommandList.Get(), m_VertexBuffer.getResource(), vertexUploadBuffer.getResource(), 0, 0, 1, &vertexData);
 
-	auto vertexBufferBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_VertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+	// m_VertexBuffer->SetName(L"Vertex Buffer Resource Heap");
 
-	m_CommandList->ResourceBarrier(1, &vertexBufferBarrier);
+	// auto vertexBufferBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+	// 		m_VertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
+	// 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+
+	// m_CommandList->ResourceBarrier(1, &vertexBufferBarrier);
 
 	// Init index buffer
 	int indexBufferSize = sizeof(indices);
@@ -278,7 +286,7 @@ void D3DContext::Init(HWND hWindow)
 			nullptr,
 			IID_PPV_ARGS(&m_IndexBuffer));
 
-	m_VertexBuffer->SetName(L"Index Buffer Resource Heap");
+	// m_VertexBuffer->SetName(L"Index Buffer Resource Heap");
 
 	ID3D12Resource *indexBufferUploadHeap;
 	auto indexBufferUploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
@@ -321,9 +329,9 @@ void D3DContext::Init(HWND hWindow)
 	// SHADERS end
 
 	// create VBO
-	m_VertexBufferView.BufferLocation = m_VertexBuffer->GetGPUVirtualAddress();
+	m_VertexBufferView.BufferLocation = m_VertexBuffer.getGpuVirtualAddress();
 	m_VertexBufferView.StrideInBytes = 7 * 4;
-	m_VertexBufferView.SizeInBytes = vBufferSize;
+	m_VertexBufferView.SizeInBytes = m_VertexBuffer.getBufferSize();
 	// create VBO end
 
 	// viewport
