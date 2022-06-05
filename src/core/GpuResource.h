@@ -1,7 +1,6 @@
 #pragma once
 
-#include <wrl/client.h>
-#include <d3d12.h>
+#include "CoreCommon.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -23,8 +22,24 @@ public:
     return m_pResoucrce.Get();
   }
 
+  const D3D12_RESOURCE_STATES getUseageState() const
+  {
+    return m_usageState;
+  }
+
+  const D3D12_RESOURCE_STATES getCurrentStage() const
+  {
+    return m_currentState;
+  }
+
+  void setCurrentStage(const D3D12_RESOURCE_STATES state)
+  {
+    m_currentState = state;
+  }
+
 protected:
   ComPtr<ID3D12Resource1> m_pResoucrce;
   D3D12_GPU_VIRTUAL_ADDRESS m_gpuVirtualAddress = NULL;
   D3D12_RESOURCE_STATES m_currentState = D3D12_RESOURCE_STATE_COMMON;
+  D3D12_RESOURCE_STATES m_usageState = D3D12_RESOURCE_STATE_COMMON;
 };

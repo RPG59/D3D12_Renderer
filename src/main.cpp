@@ -6,8 +6,12 @@
 #include "assimp/postprocess.h"
 
 #include "core/D3DContext.h"
+#include "core/CoreCommon.h"
 
 LRESULT CALLBACK MainWndProc(HWND hwnd, uint32_t msg, WPARAM wParam, LPARAM lParam);
+
+HWND g_hwnd = nullptr;
+uint32_t g_currentBuffer = 0;
 
 void loadScene()
 {
@@ -36,7 +40,6 @@ private:
 
 private:
     HINSTANCE m_HInstance = nullptr;
-    HWND m_HWindow = nullptr;
     const wchar_t *m_WinName = L"D3DWindow";
 
 public:
@@ -53,8 +56,6 @@ public:
     static App *GetApp();
 
     static void SetApp(App *);
-
-    inline HWND getHWND() { return m_HWindow; }
 };
 
 App *App::instance = nullptr;
@@ -94,22 +95,22 @@ bool App::InitWindow()
         return false;
     }
 
-    RECT rect = {0, 0, WIDTH, HEIGHT};
+    RECT rect = {0, 0, g_displayWidth, g_displayHeight};
     AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
     uint32_t width = rect.right - rect.left;
     uint32_t height = rect.bottom - rect.top;
 
-    m_HWindow = CreateWindow(m_WinName, L"some data", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, width, height,
-                             0, 0, m_HInstance, 0);
+    g_hwnd = CreateWindow(m_WinName, L"some data", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, width, height,
+                          0, 0, m_HInstance, 0);
 
-    if (!m_HWindow)
+    if (!g_hwnd)
     {
         MessageBox(0, L"Create Window is not OK!", 0, 0);
         return false;
     }
 
-    ShowWindow(m_HWindow, SW_SHOW);
-    UpdateWindow(m_HWindow);
+    ShowWindow(g_hwnd, SW_SHOW);
+    UpdateWindow(g_hwnd);
 
     return true;
 }
@@ -162,7 +163,7 @@ int CALLBACK WinMain(
 
     // loadScene();
 
-    D3DContext::getContext()->Init(App::GetApp()->getHWND());
+    D3DContext::getContext()->Init();
 
     return App::GetApp()->Run(D3DContext::getContext());
 }

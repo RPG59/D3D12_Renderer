@@ -1,14 +1,8 @@
-//
-// Created by RPG59 on 9/20/2020.
-//
 #pragma once
 
 #include "CoreCommon.h"
-#include "GpuBuffer.h"
 #include "UploadBuffer.h"
-
-#define WIDTH 1360
-#define HEIGHT 768
+#include "GpuBuffer.h"
 
 struct ConstantBuffer
 {
@@ -27,25 +21,22 @@ private:
 
 	ComPtr<ID3D12Device6> m_Device;
 	ComPtr<IDXGIFactory4> m_DxgiFactory;
-	ComPtr<IDXGISwapChain3> m_SwapChain;
+	// ComPtr<IDXGISwapChain3> m_SwapChain;
 
 	ComPtr<ID3D12CommandQueue> m_CommandQueue;
 	ComPtr<ID3D12GraphicsCommandList> m_CommandList;
 
-	ComPtr<ID3D12DescriptorHeap> m_RtvHeap;
+	// ComPtr<ID3D12DescriptorHeap> m_RtvHeap;
 	ComPtr<ID3D12DescriptorHeap> m_DsvHeap;
 
 	ComPtr<ID3D12Fence> m_Fence[SwapChainBufferCount];
 	uint64_t m_FenceValue[SwapChainBufferCount];
 
 	// descriptor sizes can vary across GPUs
-	uint32_t m_RtvDescriptorSize = 0;
+	// uint32_t m_RtvDescriptorSize = 0;
 	uint32_t m_DsvDsecriptorSize = 0;
 	uint32_t m_CbvSrvUavDescriptorSize = 0;
 	// ********
-
-	DXGI_FORMAT m_BackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-	// DXGI_FORMAT m_DepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
 	std::wstring m_MainWndCaption = L"d3d App";
 
@@ -53,7 +44,7 @@ private:
 
 	int m_CurrBackBuffer = 0;
 
-	ComPtr<ID3D12Resource> m_SwapChainBuffer[SwapChainBufferCount];
+	// ComPtr<ID3D12Resource> m_SwapChainBuffer[SwapChainBufferCount];
 	ComPtr<ID3D12Resource> m_DepthStencilBuffer;
 
 	D3D12_VIEWPORT m_ScreenViewport{};
@@ -70,7 +61,7 @@ private:
 	ComPtr<ID3D12CommandAllocator> m_CommandAllocator[SwapChainBufferCount];
 	HANDLE m_FenceEvent;
 
-	ComPtr<ID3D12Resource> m_IndexBuffer;
+	GpuBuffer m_IndexBuffer;
 	D3D12_INDEX_BUFFER_VIEW m_IndexBufferView;
 
 	ComPtr<ID3D12DescriptorHeap> m_MainDescriptorHeap[SwapChainBufferCount];
@@ -105,9 +96,7 @@ private:
 	static D3DContext *instance;
 
 public:
-	void Init(HWND);
-
-	void CreateSwapChain(HWND);
+	void Init();
 
 	void CreateRtvAndDsvDescriptorHeaps();
 
@@ -133,6 +122,14 @@ public:
 
 	void Update();
 
+	void SetViewport();
+
+	void SetScissor();
+
+	void SetBuffers();
+
+	void SetGraphicsRootSignature();
+
 	static void setContext(D3DContext *instance) { D3DContext::instance = instance; }
 
 	static D3DContext *getContext() { return D3DContext::instance; }
@@ -145,7 +142,7 @@ public:
 
 	inline static ComPtr<ID3D12GraphicsCommandList> GetCommandList() { return D3DContext::getContext()->m_CommandList; }
 
-	inline static ComPtr<ID3D12CommandQueue> GetCommandQueue() { return D3DContext::getContext()->m_CommandQueue; }
+	inline static ID3D12CommandQueue *GetCommandQueue() { return D3DContext::getContext()->m_CommandQueue.Get(); }
 
 	inline void D3DCall()
 	{

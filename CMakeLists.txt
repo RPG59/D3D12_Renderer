@@ -16,11 +16,21 @@ set(CMAKE_CXX_STANDARD 20)
 
 find_package(assimp CONFIG REQUIRED)
 
-file(GLOB project_SRC "src/**.h" "src/**.cpp" "src/core/*.h" "src/core/*.cpp")
+# file(GLOB project_SRC "src/**.h" "src/**.cpp" "src/core/*.h" "src/core/*.cpp")
 
 
 
-add_executable(D3D_12_Renderer WIN32 src/main.cpp src/core/D3DContext.h src/core/D3DContext.cpp src/Util.cpp src/Util.h src/core/GpuBuffer.cpp src/core/UploadBuffer.cpp)
+add_executable(D3D_12_Renderer WIN32 
+  src/main.cpp 
+  src/Util.cpp
+  src/core/D3DContext.cpp 
+  src/core/GpuBuffer.cpp 
+  src/core/UploadBuffer.cpp
+  src/core/SwapChain.cpp
+  src/core/SwapChainBuffer.cpp
+  src/core/Display.cpp
+  src/core/DepthBuffer.cpp
+)
 
 add_definitions(-DUNICODE -D_UNICODE -DNOMINMAX)
 

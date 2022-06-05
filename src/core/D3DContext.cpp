@@ -1,8 +1,9 @@
 #include "D3DContext.h"
+#include "Display.h"
 
 D3DContext *D3DContext::instance = nullptr;
 
-void D3DContext::Init(HWND hWindow)
+void D3DContext::Init()
 {
 	HRESULT hr;
 	// #ifndef NDEBUG
@@ -64,26 +65,28 @@ void D3DContext::Init(HWND hWindow)
 	ThrowIfFailed(m_Device->CreateCommandQueue(&qd, IID_PPV_ARGS(&m_CommandQueue)));
 	// command queue end
 
+	// FIXME!
 	// swap chain
-	CreateSwapChain(hWindow);
+	// CreateSwapChain(hWindow);
+	Display::getInstance()->init();
 	// swap chain end
 
-	CreateRtvAndDsvDescriptorHeaps();
+	// CreateRtvAndDsvDescriptorHeaps();
 
-	m_RtvDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	// m_RtvDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	m_DsvDsecriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 	m_CbvSrvUavDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	// swap chain buffrs
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart());
+	// // swap chain buffrs
+	// CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart());
 
-	for (int i = 0; i < SwapChainBufferCount; ++i)
-	{
-		ThrowIfFailed(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(m_SwapChainBuffer[i].GetAddressOf())));
-		m_Device->CreateRenderTargetView(m_SwapChainBuffer[i].Get(), nullptr, rtvHandle);
-		rtvHandle.Offset(m_RtvDescriptorSize);
-	}
-	// swap chain buffrs end
+	// for (int i = 0; i < SwapChainBufferCount; ++i)
+	// {
+	// 	ThrowIfFailed(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(m_SwapChainBuffer[i].GetAddressOf())));
+	// 	m_Device->CreateRenderTargetView(m_SwapChainBuffer[i].Get(), nullptr, rtvHandle);
+	// 	rtvHandle.Offset(m_RtvDescriptorSize);
+	// }
+	// // swap chain buffrs end
 
 	// command allocators
 	for (int i = 0; i < SwapChainBufferCount; ++i)
@@ -95,7 +98,7 @@ void D3DContext::Init(HWND hWindow)
 
 	// command list
 	m_Device->CreateCommandList(0,
-															D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator[m_frameIndex].Get(), NULL,
+															D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator[g_currentBuffer].Get(), NULL,
 															IID_PPV_ARGS(m_CommandList.GetAddressOf()));
 	// command list end
 
@@ -223,108 +226,39 @@ void D3DContext::Init(HWND hWindow)
 	};
 
 	uint32_t vBufferSize = sizeof(vertices);
-	// auto vertexBufferProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	// auto vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vBufferSize);
-
-	// ThrowIfFailed(m_Device->CreateCommittedResource(
-	// 		&vertexBufferProperties,
-	// 		D3D12_HEAP_FLAG_NONE,
-	// 		&vertexBufferDesc,
-	// 		D3D12_RESOURCE_STATE_COPY_DEST,
-	// 		nullptr,
-	// 		IID_PPV_ARGS(m_VertexBuffer.GetAddressOf())));
-
-	// auto vBufferUploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	// auto vBufferUploadHeapDesc = CD3DX12_RESOURCE_DESC::Buffer(vBufferSize);
-	// ID3D12Resource *vBufferUploadHeap = nullptr;
-
-	// ThrowIfFailed(m_Device->CreateCommittedResource(
-	// 		&vBufferUploadHeapProps,
-	// 		D3D12_HEAP_FLAG_NONE,
-	// 		&vBufferUploadHeapDesc,
-	// 		D3D12_RESOURCE_STATE_GENERIC_READ,
-	// 		nullptr,
-	// 		IID_PPV_ARGS(&vBufferUploadHeap)));
-	// vBufferUploadHeap->SetName(L"Vertex Buffer Upload Resource Heap");
 
 	UploadBuffer vertexUploadBuffer = UploadBuffer();
+	UploadBuffer indexUploadBuffer = UploadBuffer();
 
 	vertexUploadBuffer.create(L"vertex upload buffer", sizeof(vertices));
-	void *uploadMem = vertexUploadBuffer.map();
 
-	memcpy(uploadMem, vertices, sizeof(vertices));
+	memcpy(vertexUploadBuffer.map(), vertices, sizeof(vertices));
 	vertexUploadBuffer.unmap();
 
 	m_VertexBuffer = GpuBuffer();
 	m_VertexBuffer.create(L"Vertex Buffer", 56, sizeof(float), vertexUploadBuffer);
 
-	D3D12_SUBRESOURCE_DATA vertexData{};
-	vertexData.pData = reinterpret_cast<BYTE *>(vertices);
-	vertexData.RowPitch = vBufferSize;
-	vertexData.SlicePitch = vBufferSize;
+	// Index buffer
+	indexUploadBuffer.create(L"index upload buffer", sizeof(indices));
+	memcpy(indexUploadBuffer.map(), indices, sizeof(indices));
+	indexUploadBuffer.unmap();
 
-	// UpdateSubresources(m_CommandList.Get(), m_VertexBuffer.getResource(), vertexUploadBuffer.getResource(), 0, 0, 1, &vertexData);
+	m_IndexBuffer = GpuBuffer();
+	m_IndexBuffer.create(L"Index buffer", sizeof(indices) / sizeof(float), sizeof(float), indexUploadBuffer);
 
-	// m_VertexBuffer->SetName(L"Vertex Buffer Resource Heap");
-
-	// auto vertexBufferBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-	// 		m_VertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-	// 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-
-	// m_CommandList->ResourceBarrier(1, &vertexBufferBarrier);
-
-	// Init index buffer
-	int indexBufferSize = sizeof(indices);
-	auto indexBufferProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize);
-
-	m_Device->CreateCommittedResource(
-			&indexBufferProps,
-			D3D12_HEAP_FLAG_NONE,
-			&indexBufferDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(&m_IndexBuffer));
-
-	// m_VertexBuffer->SetName(L"Index Buffer Resource Heap");
-
-	ID3D12Resource *indexBufferUploadHeap;
-	auto indexBufferUploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	auto indexBufferUploadHeapDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize);
-
-	m_Device->CreateCommittedResource(
-			&indexBufferUploadHeapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&indexBufferUploadHeapDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&indexBufferUploadHeap));
-
-	D3D12_SUBRESOURCE_DATA indexData = {};
-	indexData.pData = reinterpret_cast<BYTE *>(indices);
-	indexData.RowPitch = indexBufferSize;
-	indexData.SlicePitch = indexBufferSize;
-
-	UpdateSubresources(m_CommandList.Get(), m_IndexBuffer.Get(), indexBufferUploadHeap, 0, 0, 1, &indexData);
-
-	auto indexBufferBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_IndexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-
-	m_CommandList->ResourceBarrier(1, &indexBufferBarrier);
-
-	m_IndexBufferView.BufferLocation = m_IndexBuffer->GetGPUVirtualAddress();
+	// --------------------------------------------------------------
+	m_IndexBufferView.BufferLocation = m_IndexBuffer.getGpuVirtualAddress();
 	m_IndexBufferView.Format = DXGI_FORMAT_R32_UINT;
-	m_IndexBufferView.SizeInBytes = indexBufferSize;
+	m_IndexBufferView.SizeInBytes = m_IndexBuffer.getBufferSize();
 	// init index buffer end
 
 	m_CommandList->Close();
 	ID3D12CommandList *ppCommandLists[] = {m_CommandList.Get()};
 	m_CommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-	m_FenceValue[m_frameIndex]++;
+	m_FenceValue[g_currentBuffer]++;
 
-	ThrowIfFailed(m_CommandQueue->Signal(m_Fence[m_frameIndex].Get(), m_FenceValue[m_frameIndex]));
+	ThrowIfFailed(m_CommandQueue->Signal(m_Fence[g_currentBuffer].Get(), m_FenceValue[g_currentBuffer]));
 
 	// SHADERS end
 
@@ -337,66 +271,67 @@ void D3DContext::Init(HWND hWindow)
 	// viewport
 	m_ScreenViewport.TopLeftX = 0;
 	m_ScreenViewport.TopLeftY = 0;
-	m_ScreenViewport.Width = static_cast<float>(WIDTH);
-	m_ScreenViewport.Height = static_cast<float>(HEIGHT);
+	m_ScreenViewport.Width = static_cast<float>(g_displayWidth);
+	m_ScreenViewport.Height = static_cast<float>(g_displayHeight);
 	m_ScreenViewport.MinDepth = 0;
 	m_ScreenViewport.MaxDepth = 1.;
 	// viewport end
 
 	// scissor
-	m_ScissorTest = {0, 0, WIDTH, HEIGHT};
+	m_ScissorTest = {0, 0, (long)g_displayWidth, (long)g_displayHeight};
 	// scissor end
 
 	CreateDepthStencilBuffer();
 }
 
-void D3DContext::CreateSwapChain(HWND hWindow)
-{
-	m_SwapChain.Reset();
+// void D3DContext::CreateSwapChain(HWND hWindow)
+// {
+// 	m_SwapChain.Reset();
 
-	DXGI_SWAP_CHAIN_DESC sd{};
-	sd.BufferDesc.Width = WIDTH;
-	sd.BufferDesc.Height = HEIGHT;
-	sd.BufferDesc.RefreshRate.Numerator = 60;
-	sd.BufferDesc.RefreshRate.Denominator = 1;
-	sd.BufferDesc.Format = m_BackBufferFormat;
-	sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-	sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-	sd.SampleDesc.Count = 1;
-	sd.SampleDesc.Quality = 0;
-	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	sd.BufferCount = SwapChainBufferCount;
-	sd.OutputWindow = hWindow;
-	sd.Windowed = true;
-	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+// 	DXGI_SWAP_CHAIN_DESC sd{};
+// 	sd.BufferDesc.Width = WIDTH;
+// 	sd.BufferDesc.Height = HEIGHT;
+// 	sd.BufferDesc.RefreshRate.Numerator = 60;
+// 	sd.BufferDesc.RefreshRate.Denominator = 1;
+// 	sd.BufferDesc.Format = m_BackBufferFormat;
+// 	sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+// 	sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+// 	sd.SampleDesc.Count = 1;
+// 	sd.SampleDesc.Quality = 0;
+// 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+// 	sd.BufferCount = SwapChainBufferCount;
+// 	sd.OutputWindow = hWindow;
+// 	sd.Windowed = true;
+// 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+// 	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
-	IDXGISwapChain *tmpSwapCahin = nullptr;
+// 	IDXGISwapChain *tmpSwapCahin = nullptr;
 
-	m_DxgiFactory->CreateSwapChain(m_CommandQueue.Get(), &sd, &tmpSwapCahin);
+// 	m_DxgiFactory->(m_CommandQueue.Get(), &sd, &tmpSwapCahin);
 
-	m_SwapChain = static_cast<IDXGISwapChain3 *>(tmpSwapCahin);
+// 	m_SwapChain = static_cast<IDXGISwapChain3 *>(tmpSwapCahin);
 
-	m_frameIndex = m_SwapChain->GetCurrentBackBufferIndex();
-}
+// 	g_currentBuffer = m_SwapChain->GetCurrentBackBufferIndex();
+// }
 
 void D3DContext::CreateRtvAndDsvDescriptorHeaps()
 {
-	D3D12_DESCRIPTOR_HEAP_DESC rhd_rtv{};
-	rhd_rtv.NumDescriptors = SwapChainBufferCount;
-	rhd_rtv.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	rhd_rtv.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	rhd_rtv.NodeMask = 0;
+	// Moved to Display.cpp
+	// D3D12_DESCRIPTOR_HEAP_DESC rhd_rtv{};
+	// rhd_rtv.NumDescriptors = SwapChainBufferCount;
+	// rhd_rtv.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	// rhd_rtv.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	// rhd_rtv.NodeMask = 0;
 
-	ThrowIfFailed(m_Device->CreateDescriptorHeap(&rhd_rtv, IID_PPV_ARGS(m_RtvHeap.GetAddressOf())));
+	// ThrowIfFailed(m_Device->CreateDescriptorHeap(&rhd_rtv, IID_PPV_ARGS(m_RtvHeap.GetAddressOf())));
 
-	D3D12_DESCRIPTOR_HEAP_DESC rhd_dsv{};
-	rhd_dsv.NumDescriptors = 1;
-	rhd_dsv.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	rhd_dsv.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	rhd_dsv.NodeMask = 0;
+	// D3D12_DESCRIPTOR_HEAP_DESC rhd_dsv{};
+	// rhd_dsv.NumDescriptors = 1;
+	// rhd_dsv.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	// rhd_dsv.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	// rhd_dsv.NodeMask = 0;
 
-	ThrowIfFailed(m_Device->CreateDescriptorHeap(&rhd_dsv, IID_PPV_ARGS(m_DsvHeap.GetAddressOf())));
+	// ThrowIfFailed(m_Device->CreateDescriptorHeap(&rhd_dsv, IID_PPV_ARGS(m_DsvHeap.GetAddressOf())));
 }
 
 void D3DContext::LogAdapters()
@@ -429,80 +364,88 @@ void D3DContext::LogAdapters()
 
 void D3DContext::CreateDepthStencilBuffer()
 {
-	D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
-	dsvd.Format = DXGI_FORMAT_D32_FLOAT;
-	dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	dsvd.Flags = D3D12_DSV_FLAG_NONE;
+	// D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
+	// dsvd.Format = DXGI_FORMAT_D32_FLOAT;
+	// dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	// dsvd.Flags = D3D12_DSV_FLAG_NONE;
 
-	D3D12_CLEAR_VALUE depthOptimizedCliarValue{};
-	depthOptimizedCliarValue.Format = DXGI_FORMAT_D32_FLOAT;
-	depthOptimizedCliarValue.DepthStencil.Depth = 1.0;
-	depthOptimizedCliarValue.DepthStencil.Stencil = 0;
+	// D3D12_CLEAR_VALUE depthOptimizedCliarValue{};
+	// depthOptimizedCliarValue.Format = DXGI_FORMAT_D32_FLOAT;
+	// depthOptimizedCliarValue.DepthStencil.Depth = 1.0;
+	// depthOptimizedCliarValue.DepthStencil.Stencil = 0;
 
-	auto depthStencilBufferProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	auto depthStencilBufferDesc =
-			CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, WIDTH, HEIGHT, 1, 0, 1, 0,
-																	 D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+	// auto depthStencilBufferProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	// auto depthStencilBufferDesc =
+	// 		CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, g_displayWidth, g_displayHeight, 1, 0, 1, 0,
+	// 																 D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
-	m_Device->CreateCommittedResource(
-			&depthStencilBufferProps,
-			D3D12_HEAP_FLAG_NONE,
-			&depthStencilBufferDesc,
-			D3D12_RESOURCE_STATE_DEPTH_WRITE,
-			&depthOptimizedCliarValue,
-			IID_PPV_ARGS(&m_DepthStencilBuffer));
+	// m_Device->CreateCommittedResource(
+	// 		&depthStencilBufferProps,
+	// 		D3D12_HEAP_FLAG_NONE,
+	// 		&depthStencilBufferDesc,
+	// 		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+	// 		&depthOptimizedCliarValue,
+	// 		IID_PPV_ARGS(&m_DepthStencilBuffer));
 
-	m_DsvHeap->SetName(L"Depth/Stencil Resource Map");
-	m_Device->CreateDepthStencilView(m_DepthStencilBuffer.Get(), &dsvd,
-																	 m_DsvHeap->GetCPUDescriptorHandleForHeapStart());
+	// m_DsvHeap->SetName(L"Depth/Stencil Resource Map");
+	// m_Device->CreateDepthStencilView(m_DepthStencilBuffer.Get(), &dsvd,
+	// 																 m_DsvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	UpdateConstantBufferData();
+}
+
+void D3DContext::SetGraphicsRootSignature()
+{
+	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 }
 
 void D3DContext::UpdatePipeline()
 {
 	WaitForPrevFrame();
 
-	ThrowIfFailed(m_CommandAllocator[m_frameIndex]->Reset());
-	ThrowIfFailed(m_CommandList->Reset(m_CommandAllocator[m_frameIndex].Get(), m_PipelineState.Get()));
+	ThrowIfFailed(m_CommandAllocator[g_currentBuffer]->Reset());
+	ThrowIfFailed(m_CommandList->Reset(m_CommandAllocator[g_currentBuffer].Get(), m_PipelineState.Get()));
 
-	auto swapChainBufferBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_SwapChainBuffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT,
-			D3D12_RESOURCE_STATE_RENDER_TARGET);
+	// auto swapChainBufferBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+	// 		m_SwapChainBuffer[g_currentBuffer].Get(), D3D12_RESOURCE_STATE_PRESENT,
+	// 		D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-	m_CommandList->ResourceBarrier(1, &swapChainBufferBarrier);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex,
-																					m_RtvDescriptorSize);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_DsvHeap->GetCPUDescriptorHandleForHeapStart());
-	m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+	// m_CommandList->ResourceBarrier(1, &swapChainBufferBarrier);
+	// CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart(), g_currentBuffer,
+	// 																				m_RtvDescriptorSize);
+	// CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_DsvHeap->GetCPUDescriptorHandleForHeapStart());
+	// m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-	const float color[4] = {.3, .4, .1, .0};
-	m_CommandList->ClearRenderTargetView(rtvHandle, color, 0, nullptr);
-	m_CommandList->ClearDepthStencilView(m_DsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1., 0,
-																			 0, nullptr);
+	// const float color[4] = {.3, .4, .1, .0};
+	// m_CommandList->ClearRenderTargetView(rtvHandle, color, 0, nullptr);
+	// m_CommandList->ClearDepthStencilView(m_DsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1., 0,
+	// 																		 0, nullptr);
 
-	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
-
-	m_CommandList->RSSetViewports(1, &m_ScreenViewport);
-	m_CommandList->RSSetScissorRects(1, &m_ScissorTest);
-	m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_CommandList->IASetVertexBuffers(0, 1, &m_VertexBufferView);
-	m_CommandList->IASetIndexBuffer(&m_IndexBufferView);
-	// m_CommandList->DrawInstanced(3, 1, 0, 0);
-
-	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[m_frameIndex]->GetGPUVirtualAddress());
-	m_CommandList->DrawIndexedInstanced(6, 1, 0, 4, 0);
-
-	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[m_frameIndex]->GetGPUVirtualAddress() + m_ConstantBufferPerObjectAlignedSize);
-	m_CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
-
-	auto swapChainBarrier2 = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_SwapChainBuffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET,
-			D3D12_RESOURCE_STATE_PRESENT);
-
-	m_CommandList->ResourceBarrier(1, &swapChainBarrier2);
+	Display::getInstance()->prepearePresent();
 
 	ThrowIfFailed(m_CommandList->Close());
+}
+
+void D3DContext::SetBuffers()
+{
+	m_CommandList->IASetVertexBuffers(0, 1, &m_VertexBufferView);
+	m_CommandList->IASetIndexBuffer(&m_IndexBufferView);
+
+	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[g_currentBuffer]->GetGPUVirtualAddress());
+	m_CommandList->DrawIndexedInstanced(6, 1, 0, 4, 0);
+
+	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[g_currentBuffer]->GetGPUVirtualAddress() + m_ConstantBufferPerObjectAlignedSize);
+	m_CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+}
+
+void D3DContext::SetScissor()
+{
+	m_CommandList->RSSetScissorRects(1, &m_ScissorTest);
+}
+
+void D3DContext::SetViewport()
+{
+	m_CommandList->RSSetViewports(1, &m_ScreenViewport);
 }
 
 void D3DContext::Render()
@@ -513,22 +456,30 @@ void D3DContext::Render()
 
 	m_CommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-	ThrowIfFailed(m_CommandQueue->Signal(m_Fence[m_frameIndex].Get(), m_FenceValue[m_frameIndex]));
-	ThrowIfFailed(m_SwapChain->Present(0, 0));
+	ThrowIfFailed(m_CommandQueue->Signal(m_Fence[g_currentBuffer].Get(), m_FenceValue[g_currentBuffer]));
+	// ThrowIfFailed(m_SwapChain->Present(0, 0));
+	Display::getInstance()->present();
 }
 
 void D3DContext::WaitForPrevFrame()
 {
-	m_frameIndex = m_SwapChain->GetCurrentBackBufferIndex();
+	// FIXME: REMOVE THIS! ********************
+	auto tmpSwapChain = Display::getInstance()->getSwapchain()->_getSwapChain();
+	auto swapChain = static_cast<IDXGISwapChain3 *>(tmpSwapChain);
 
-	if (m_Fence[m_frameIndex]->GetCompletedValue() < m_FenceValue[m_frameIndex])
+	g_currentBuffer = swapChain->GetCurrentBackBufferIndex();
+	// ****************************************
+
+	// g_currentBuffer = (g_currentBuffer + 1) % SWAP_CHAIN_BUFFER_COUNT;
+
+	if (m_Fence[g_currentBuffer]->GetCompletedValue() < m_FenceValue[g_currentBuffer])
 	{
-		ThrowIfFailed(m_Fence[m_frameIndex]->SetEventOnCompletion(m_FenceValue[m_frameIndex], m_FenceEvent));
+		ThrowIfFailed(m_Fence[g_currentBuffer]->SetEventOnCompletion(m_FenceValue[g_currentBuffer], m_FenceEvent));
 
 		WaitForSingleObject(m_FenceEvent, INFINITE);
 	}
 
-	m_FenceValue[m_frameIndex]++;
+	m_FenceValue[g_currentBuffer]++;
 }
 
 void D3DContext::SetConstantBuffer()
@@ -591,7 +542,7 @@ void D3DContext::UpdateConstantBufferData()
 		memcpy(m_CbGPUAddress[i] + m_ConstantBufferPerObjectAlignedSize, &m_CbPerObjec, sizeof(m_CbPerObjec));
 	}
 
-	XMMATRIX tmpMat = XMMatrixPerspectiveFovLH(45. * (XM_PI / 180.), (float)WIDTH / (float)HEIGHT, .1, 1000.);
+	XMMATRIX tmpMat = XMMatrixPerspectiveFovLH(45. * (XM_PI / 180.), (float)g_displayWidth / (float)g_displayHeight, .1, 1000.);
 	XMStoreFloat4x4(&m_ProjectionMatrix, tmpMat);
 
 	m_CameraPosition = XMFLOAT4(.0, 2., -4., .0);
@@ -638,7 +589,7 @@ void D3DContext::Update()
 	XMMATRIX transposed = XMMatrixTranspose(mvpMat);
 	XMStoreFloat4x4(&m_CbPerObjec.mvpMatrix, transposed);
 
-	memcpy(m_CbGPUAddress[m_frameIndex], &m_CbPerObjec, sizeof(m_CbPerObjec));
+	memcpy(m_CbGPUAddress[g_currentBuffer], &m_CbPerObjec, sizeof(m_CbPerObjec));
 
 	rotXmat = XMMatrixRotationX(.0003);
 	rotYmat = XMMatrixRotationY(.0002);
@@ -656,7 +607,7 @@ void D3DContext::Update()
 	transposed = XMMatrixTranspose(mvpMat);
 	XMStoreFloat4x4(&m_CbPerObjec.mvpMatrix, transposed);
 
-	memcpy(m_CbGPUAddress[m_frameIndex] + m_ConstantBufferPerObjectAlignedSize, &m_CbPerObjec, sizeof(m_CbPerObjec));
+	memcpy(m_CbGPUAddress[g_currentBuffer] + m_ConstantBufferPerObjectAlignedSize, &m_CbPerObjec, sizeof(m_CbPerObjec));
 
 	XMStoreFloat4x4(&m_Cube2WorldMatrix, worldMat);
 }
