@@ -13,14 +13,15 @@ void Display::init()
 void Display::prepearePresent()
 {
   auto context = D3DContext::getContext();
+  auto currentBackBufferIndex = getCurrentBackBufferIndex();
 
-  m_swapChain->transitionBuffer(D3D12_RESOURCE_STATE_RENDER_TARGET, g_currentBuffer);
+  m_swapChain->transitionBuffer(D3D12_RESOURCE_STATE_RENDER_TARGET, currentBackBufferIndex);
 
   D3DContext::GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
   m_depthBuffer->clear();
 
-  auto rtvHandle = m_swapChain->getRtv();
+  auto rtvHandle = m_swapChain->getRtv(currentBackBufferIndex);
   const float color[4] = {.3, .4, .1, .0};
 
   D3DContext::GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &(m_depthBuffer->getDsv()));
@@ -31,7 +32,7 @@ void Display::prepearePresent()
   context->SetScissor();
   context->SetBuffers();
 
-  m_swapChain->transitionBuffer(D3D12_RESOURCE_STATE_PRESENT, g_currentBuffer);
+  m_swapChain->transitionBuffer(D3D12_RESOURCE_STATE_PRESENT, currentBackBufferIndex);
 }
 
 void Display::present()

@@ -31,9 +31,10 @@ void SwapChain::createSwapChain()
   fsSwapChainDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
   fsSwapChainDesc.Windowed = true;
 
-  dxgiFactory->CreateSwapChainForHwnd(D3DContext::GetCommandQueue(), g_hwnd, &sd, &fsSwapChainDesc, nullptr, m_swapChain.GetAddressOf());
+  IDXGISwapChain1 *tmpSwapChain = nullptr;
 
-  // m_frameIndex = m_SwapChain->GetCurrentBackBufferIndex(); // Google it
+  dxgiFactory->CreateSwapChainForHwnd(D3DContext::GetCommandQueue(), g_hwnd, &sd, &fsSwapChainDesc, nullptr, &tmpSwapChain);
+  tmpSwapChain->QueryInterface(__uuidof(IDXGISwapChain3), (void **)(m_swapChain.GetAddressOf()));
 }
 
 void SwapChain::createRtvHeap()

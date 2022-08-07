@@ -17,8 +17,6 @@ struct ConstantBufferPerObject
 class D3DContext
 {
 private:
-	static const int SwapChainBufferCount = 2;
-
 	ComPtr<ID3D12Device6> m_Device;
 	ComPtr<IDXGIFactory4> m_DxgiFactory;
 	// ComPtr<IDXGISwapChain3> m_SwapChain;
@@ -29,8 +27,8 @@ private:
 	// ComPtr<ID3D12DescriptorHeap> m_RtvHeap;
 	ComPtr<ID3D12DescriptorHeap> m_DsvHeap;
 
-	ComPtr<ID3D12Fence> m_Fence[SwapChainBufferCount];
-	uint64_t m_FenceValue[SwapChainBufferCount];
+	ComPtr<ID3D12Fence> m_Fence[SWAP_CHAIN_BUFFER_COUNT];
+	uint64_t m_FenceValue[SWAP_CHAIN_BUFFER_COUNT];
 
 	// descriptor sizes can vary across GPUs
 	// uint32_t m_RtvDescriptorSize = 0;
@@ -44,7 +42,6 @@ private:
 
 	int m_CurrBackBuffer = 0;
 
-	// ComPtr<ID3D12Resource> m_SwapChainBuffer[SwapChainBufferCount];
 	ComPtr<ID3D12Resource> m_DepthStencilBuffer;
 
 	D3D12_VIEWPORT m_ScreenViewport{};
@@ -58,21 +55,21 @@ private:
 
 	int m_frameIndex = 0;
 
-	ComPtr<ID3D12CommandAllocator> m_CommandAllocator[SwapChainBufferCount];
+	ComPtr<ID3D12CommandAllocator> m_CommandAllocator[SWAP_CHAIN_BUFFER_COUNT];
 	HANDLE m_FenceEvent;
 
 	GpuBuffer m_IndexBuffer;
 	D3D12_INDEX_BUFFER_VIEW m_IndexBufferView;
 
-	ComPtr<ID3D12DescriptorHeap> m_MainDescriptorHeap[SwapChainBufferCount];
+	ComPtr<ID3D12DescriptorHeap> m_MainDescriptorHeap[SWAP_CHAIN_BUFFER_COUNT];
 
 	ConstantBuffer m_CbColorMultiplierData; // constant buffer data
 
 	ConstantBufferPerObject m_CbPerObjec;
 
-	ComPtr<ID3D12Resource> m_ConstantBufferUploadHeaps[SwapChainBufferCount];
+	ComPtr<ID3D12Resource> m_ConstantBufferUploadHeaps[SWAP_CHAIN_BUFFER_COUNT];
 
-	uint8_t *m_CbGPUAddress[SwapChainBufferCount];
+	uint8_t *m_CbGPUAddress[SWAP_CHAIN_BUFFER_COUNT];
 
 	XMFLOAT4X4 m_ProjectionMatrix;
 	XMFLOAT4X4 m_ViewMatrix;
@@ -98,17 +95,13 @@ private:
 public:
 	void Init();
 
-	void CreateRtvAndDsvDescriptorHeaps();
-
 	void LogAdapters();
 
 	void OnResize();
 
 	void InitShaders();
 
-	void UpdatePipeline();
-
-	void WaitForPrevFrame();
+	void UpdatePipeline(uint32_t);
 
 	void Render();
 

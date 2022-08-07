@@ -8,12 +8,9 @@ void D3DContext::Init()
 	HRESULT hr;
 	// #ifndef NDEBUG
 	ComPtr<ID3D12Debug3> debugController;
-	hr = D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
 
-	if (FAILED(hr))
-	{
-		DebugBreak();
-	}
+	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
+
 	debugController->EnableDebugLayer();
 	debugController->SetEnableGPUBasedValidation(true);
 	// #endif
@@ -23,24 +20,14 @@ void D3DContext::Init()
 
 	ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(tmp_factory.GetAddressOf())));
 
-	auto hr_factory7 = tmp_factory->QueryInterface(__uuidof(IDXGIFactory7), (void **)m_DxgiFactory.GetAddressOf());
-	if (FAILED(hr_factory7))
-	{
-		DebugBreak();
-	}
+	ThrowIfFailed(tmp_factory->QueryInterface(__uuidof(IDXGIFactory7), (void **)m_DxgiFactory.GetAddressOf()));
 
 	ThrowIfFailed(D3D12CreateDevice(
 			nullptr,
 			D3D_FEATURE_LEVEL_12_0,
-			//            IID_PPV_ARGS(&m_Device)
-			//            tmpDevice.GetAddressOf()
 			IID_PPV_ARGS(tmp_device.GetAddressOf())));
 
-	auto hr_device6 = tmp_device->QueryInterface(__uuidof(ID3D12Device6), (void **)m_Device.GetAddressOf());
-	if (FAILED(hr_device6))
-	{
-		DebugBreak();
-	}
+	ThrowIfFailed(tmp_device->QueryInterface(__uuidof(ID3D12Device6), (void **)m_Device.GetAddressOf()));
 
 	// D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS msQualityLevels{};
 	// msQualityLevels.Format = m_BackBufferFormat;
@@ -65,31 +52,14 @@ void D3DContext::Init()
 	ThrowIfFailed(m_Device->CreateCommandQueue(&qd, IID_PPV_ARGS(&m_CommandQueue)));
 	// command queue end
 
-	// FIXME!
-	// swap chain
-	// CreateSwapChain(hWindow);
 	Display::getInstance()->init();
-	// swap chain end
+	auto currentBackBufferIndex = Display::getInstance()->getCurrentBackBufferIndex();
 
-	// CreateRtvAndDsvDescriptorHeaps();
-
-	// m_RtvDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	m_DsvDsecriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 	m_CbvSrvUavDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	// // swap chain buffrs
-	// CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-	// for (int i = 0; i < SwapChainBufferCount; ++i)
-	// {
-	// 	ThrowIfFailed(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(m_SwapChainBuffer[i].GetAddressOf())));
-	// 	m_Device->CreateRenderTargetView(m_SwapChainBuffer[i].Get(), nullptr, rtvHandle);
-	// 	rtvHandle.Offset(m_RtvDescriptorSize);
-	// }
-	// // swap chain buffrs end
-
 	// command allocators
-	for (int i = 0; i < SwapChainBufferCount; ++i)
+	for (int i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
 	{
 		ThrowIfFailed(
 				m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_CommandAllocator[i].GetAddressOf())));
@@ -98,12 +68,12 @@ void D3DContext::Init()
 
 	// command list
 	m_Device->CreateCommandList(0,
-															D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator[g_currentBuffer].Get(), NULL,
+															D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator[currentBackBufferIndex].Get(), NULL,
 															IID_PPV_ARGS(m_CommandList.GetAddressOf()));
 	// command list end
 
 	// fence
-	for (int i = 0; i < SwapChainBufferCount; ++i)
+	for (int i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
 	{
 		ThrowIfFailed(m_Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_Fence[i].GetAddressOf())));
 		m_FenceValue[i] = 0;
@@ -256,9 +226,9 @@ void D3DContext::Init()
 	ID3D12CommandList *ppCommandLists[] = {m_CommandList.Get()};
 	m_CommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-	m_FenceValue[g_currentBuffer]++;
+	m_FenceValue[currentBackBufferIndex]++;
 
-	ThrowIfFailed(m_CommandQueue->Signal(m_Fence[g_currentBuffer].Get(), m_FenceValue[g_currentBuffer]));
+	ThrowIfFailed(m_CommandQueue->Signal(m_Fence[currentBackBufferIndex].Get(), m_FenceValue[currentBackBufferIndex]));
 
 	// SHADERS end
 
@@ -282,56 +252,6 @@ void D3DContext::Init()
 	// scissor end
 
 	CreateDepthStencilBuffer();
-}
-
-// void D3DContext::CreateSwapChain(HWND hWindow)
-// {
-// 	m_SwapChain.Reset();
-
-// 	DXGI_SWAP_CHAIN_DESC sd{};
-// 	sd.BufferDesc.Width = WIDTH;
-// 	sd.BufferDesc.Height = HEIGHT;
-// 	sd.BufferDesc.RefreshRate.Numerator = 60;
-// 	sd.BufferDesc.RefreshRate.Denominator = 1;
-// 	sd.BufferDesc.Format = m_BackBufferFormat;
-// 	sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-// 	sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-// 	sd.SampleDesc.Count = 1;
-// 	sd.SampleDesc.Quality = 0;
-// 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-// 	sd.BufferCount = SwapChainBufferCount;
-// 	sd.OutputWindow = hWindow;
-// 	sd.Windowed = true;
-// 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-// 	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-
-// 	IDXGISwapChain *tmpSwapCahin = nullptr;
-
-// 	m_DxgiFactory->(m_CommandQueue.Get(), &sd, &tmpSwapCahin);
-
-// 	m_SwapChain = static_cast<IDXGISwapChain3 *>(tmpSwapCahin);
-
-// 	g_currentBuffer = m_SwapChain->GetCurrentBackBufferIndex();
-// }
-
-void D3DContext::CreateRtvAndDsvDescriptorHeaps()
-{
-	// Moved to Display.cpp
-	// D3D12_DESCRIPTOR_HEAP_DESC rhd_rtv{};
-	// rhd_rtv.NumDescriptors = SwapChainBufferCount;
-	// rhd_rtv.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	// rhd_rtv.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	// rhd_rtv.NodeMask = 0;
-
-	// ThrowIfFailed(m_Device->CreateDescriptorHeap(&rhd_rtv, IID_PPV_ARGS(m_RtvHeap.GetAddressOf())));
-
-	// D3D12_DESCRIPTOR_HEAP_DESC rhd_dsv{};
-	// rhd_dsv.NumDescriptors = 1;
-	// rhd_dsv.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	// rhd_dsv.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	// rhd_dsv.NodeMask = 0;
-
-	// ThrowIfFailed(m_Device->CreateDescriptorHeap(&rhd_dsv, IID_PPV_ARGS(m_DsvHeap.GetAddressOf())));
 }
 
 void D3DContext::LogAdapters()
@@ -364,33 +284,6 @@ void D3DContext::LogAdapters()
 
 void D3DContext::CreateDepthStencilBuffer()
 {
-	// D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
-	// dsvd.Format = DXGI_FORMAT_D32_FLOAT;
-	// dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	// dsvd.Flags = D3D12_DSV_FLAG_NONE;
-
-	// D3D12_CLEAR_VALUE depthOptimizedCliarValue{};
-	// depthOptimizedCliarValue.Format = DXGI_FORMAT_D32_FLOAT;
-	// depthOptimizedCliarValue.DepthStencil.Depth = 1.0;
-	// depthOptimizedCliarValue.DepthStencil.Stencil = 0;
-
-	// auto depthStencilBufferProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	// auto depthStencilBufferDesc =
-	// 		CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, g_displayWidth, g_displayHeight, 1, 0, 1, 0,
-	// 																 D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-
-	// m_Device->CreateCommittedResource(
-	// 		&depthStencilBufferProps,
-	// 		D3D12_HEAP_FLAG_NONE,
-	// 		&depthStencilBufferDesc,
-	// 		D3D12_RESOURCE_STATE_DEPTH_WRITE,
-	// 		&depthOptimizedCliarValue,
-	// 		IID_PPV_ARGS(&m_DepthStencilBuffer));
-
-	// m_DsvHeap->SetName(L"Depth/Stencil Resource Map");
-	// m_Device->CreateDepthStencilView(m_DepthStencilBuffer.Get(), &dsvd,
-	// 																 m_DsvHeap->GetCPUDescriptorHandleForHeapStart());
-
 	UpdateConstantBufferData();
 }
 
@@ -399,27 +292,19 @@ void D3DContext::SetGraphicsRootSignature()
 	m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 }
 
-void D3DContext::UpdatePipeline()
+void D3DContext::UpdatePipeline(uint32_t currentBackBufferIndex)
 {
-	WaitForPrevFrame();
+	if (m_Fence[currentBackBufferIndex]->GetCompletedValue() < m_FenceValue[currentBackBufferIndex])
+	{
+		ThrowIfFailed(m_Fence[currentBackBufferIndex]->SetEventOnCompletion(m_FenceValue[currentBackBufferIndex], m_FenceEvent));
 
-	ThrowIfFailed(m_CommandAllocator[g_currentBuffer]->Reset());
-	ThrowIfFailed(m_CommandList->Reset(m_CommandAllocator[g_currentBuffer].Get(), m_PipelineState.Get()));
+		WaitForSingleObject(m_FenceEvent, INFINITE);
+	}
 
-	// auto swapChainBufferBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-	// 		m_SwapChainBuffer[g_currentBuffer].Get(), D3D12_RESOURCE_STATE_PRESENT,
-	// 		D3D12_RESOURCE_STATE_RENDER_TARGET);
+	m_FenceValue[currentBackBufferIndex]++;
 
-	// m_CommandList->ResourceBarrier(1, &swapChainBufferBarrier);
-	// CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart(), g_currentBuffer,
-	// 																				m_RtvDescriptorSize);
-	// CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_DsvHeap->GetCPUDescriptorHandleForHeapStart());
-	// m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-
-	// const float color[4] = {.3, .4, .1, .0};
-	// m_CommandList->ClearRenderTargetView(rtvHandle, color, 0, nullptr);
-	// m_CommandList->ClearDepthStencilView(m_DsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1., 0,
-	// 																		 0, nullptr);
+	ThrowIfFailed(m_CommandAllocator[currentBackBufferIndex]->Reset());
+	ThrowIfFailed(m_CommandList->Reset(m_CommandAllocator[currentBackBufferIndex].Get(), m_PipelineState.Get()));
 
 	Display::getInstance()->prepearePresent();
 
@@ -428,13 +313,15 @@ void D3DContext::UpdatePipeline()
 
 void D3DContext::SetBuffers()
 {
+	auto currentBackBufferIndex = Display::getInstance()->getCurrentBackBufferIndex();
+
 	m_CommandList->IASetVertexBuffers(0, 1, &m_VertexBufferView);
 	m_CommandList->IASetIndexBuffer(&m_IndexBufferView);
 
-	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[g_currentBuffer]->GetGPUVirtualAddress());
+	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[currentBackBufferIndex]->GetGPUVirtualAddress());
 	m_CommandList->DrawIndexedInstanced(6, 1, 0, 4, 0);
 
-	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[g_currentBuffer]->GetGPUVirtualAddress() + m_ConstantBufferPerObjectAlignedSize);
+	m_CommandList->SetGraphicsRootConstantBufferView(0, m_ConstantBufferUploadHeaps[currentBackBufferIndex]->GetGPUVirtualAddress() + m_ConstantBufferPerObjectAlignedSize);
 	m_CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 }
 
@@ -450,36 +337,17 @@ void D3DContext::SetViewport()
 
 void D3DContext::Render()
 {
-	UpdatePipeline();
+	auto currentBackBufferIndex = Display::getInstance()->getCurrentBackBufferIndex();
+
+	UpdatePipeline(currentBackBufferIndex);
 
 	ID3D12CommandList *ppCommandLists[] = {m_CommandList.Get()};
 
 	m_CommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-	ThrowIfFailed(m_CommandQueue->Signal(m_Fence[g_currentBuffer].Get(), m_FenceValue[g_currentBuffer]));
+	ThrowIfFailed(m_CommandQueue->Signal(m_Fence[currentBackBufferIndex].Get(), m_FenceValue[currentBackBufferIndex]));
 	// ThrowIfFailed(m_SwapChain->Present(0, 0));
 	Display::getInstance()->present();
-}
-
-void D3DContext::WaitForPrevFrame()
-{
-	// FIXME: REMOVE THIS! ********************
-	auto tmpSwapChain = Display::getInstance()->getSwapchain()->_getSwapChain();
-	auto swapChain = static_cast<IDXGISwapChain3 *>(tmpSwapChain);
-
-	g_currentBuffer = swapChain->GetCurrentBackBufferIndex();
-	// ****************************************
-
-	// g_currentBuffer = (g_currentBuffer + 1) % SWAP_CHAIN_BUFFER_COUNT;
-
-	if (m_Fence[g_currentBuffer]->GetCompletedValue() < m_FenceValue[g_currentBuffer])
-	{
-		ThrowIfFailed(m_Fence[g_currentBuffer]->SetEventOnCompletion(m_FenceValue[g_currentBuffer], m_FenceEvent));
-
-		WaitForSingleObject(m_FenceEvent, INFINITE);
-	}
-
-	m_FenceValue[g_currentBuffer]++;
 }
 
 void D3DContext::SetConstantBuffer()
@@ -520,7 +388,7 @@ void D3DContext::SetConstantBuffer()
 
 void D3DContext::UpdateConstantBufferData()
 {
-	for (int i = 0; i < SwapChainBufferCount; ++i)
+	for (int i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
 	{
 		auto constantBufferUploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto constantBufferUploadHeapDesc =
@@ -572,6 +440,7 @@ void D3DContext::UpdateConstantBufferData()
 
 void D3DContext::Update()
 {
+	auto currentBackBufferIndex = Display::getInstance()->getCurrentBackBufferIndex();
 	XMMATRIX rotXmat = XMMatrixRotationX(.0001);
 	XMMATRIX rotYmat = XMMatrixRotationY(.0002);
 	XMMATRIX rotZmat = XMMatrixRotationZ(.0003);
@@ -589,7 +458,7 @@ void D3DContext::Update()
 	XMMATRIX transposed = XMMatrixTranspose(mvpMat);
 	XMStoreFloat4x4(&m_CbPerObjec.mvpMatrix, transposed);
 
-	memcpy(m_CbGPUAddress[g_currentBuffer], &m_CbPerObjec, sizeof(m_CbPerObjec));
+	memcpy(m_CbGPUAddress[currentBackBufferIndex], &m_CbPerObjec, sizeof(m_CbPerObjec));
 
 	rotXmat = XMMatrixRotationX(.0003);
 	rotYmat = XMMatrixRotationY(.0002);
@@ -607,7 +476,7 @@ void D3DContext::Update()
 	transposed = XMMatrixTranspose(mvpMat);
 	XMStoreFloat4x4(&m_CbPerObjec.mvpMatrix, transposed);
 
-	memcpy(m_CbGPUAddress[g_currentBuffer] + m_ConstantBufferPerObjectAlignedSize, &m_CbPerObjec, sizeof(m_CbPerObjec));
+	memcpy(m_CbGPUAddress[currentBackBufferIndex] + m_ConstantBufferPerObjectAlignedSize, &m_CbPerObjec, sizeof(m_CbPerObjec));
 
 	XMStoreFloat4x4(&m_Cube2WorldMatrix, worldMat);
 }

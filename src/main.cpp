@@ -11,7 +11,6 @@
 LRESULT CALLBACK MainWndProc(HWND hwnd, uint32_t msg, WPARAM wParam, LPARAM lParam);
 
 HWND g_hwnd = nullptr;
-uint32_t g_currentBuffer = 0;
 
 void loadScene()
 {
